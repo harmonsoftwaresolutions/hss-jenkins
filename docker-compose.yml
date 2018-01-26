@@ -1,13 +1,21 @@
+---
 version: '3.2'
+
 services:
-  jenkins-master:
-    build: .
+  master:
+    build: jenkins-master
     environment:
       JAVA_OPTS: "-Djava.awt.headless=true"
     ports:
       - "50000:50000"
-      - "8080:8080"
     volumes:
       - jenkins-data:/var/jenkins_home
+  nginx:
+    build: jenkins-nginx
+    ports:
+      - "8000:80"
+    depends_on:
+      - master
+
 volumes:
   jenkins-data:
