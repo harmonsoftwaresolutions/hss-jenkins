@@ -21,8 +21,7 @@ ARG JENKINS_URL=https://repo.jenkins-ci.org/public/org/jenkins-ci/main/jenkins-w
 
 
 # INSTALLS
-RUN amazon-linux-extras install nginx1.12 \
-  && yum install -y java-devel git unzip \
+RUN yum install -y java-devel git unzip \
   && yum update -y
 
 # Jenkins is run with user `jenkins`, uid = 1000
@@ -45,6 +44,7 @@ COPY --chown=1000:0 plugins.txt /usr/share/jenkins/plugins.txt
 # or config file with your custom jenkins Docker image.
 # Pre-Install Plugins
 COPY init.groovy /usr/share/jenkins/ref/init.groovy.d/tcp-slave-agent-port.groovy
+COPY security.groovy /usr/share/jenkins/ref/init.groovy.d/security.groovy
 
 RUN chmod -R +x /usr/local/bin/ \
   && /usr/local/bin/install-plugins.sh < /usr/share/jenkins/plugins.txt
