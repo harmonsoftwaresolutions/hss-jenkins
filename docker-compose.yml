@@ -5,7 +5,7 @@ services:
   master:
     image: hss/jenkins-master:latest
     environment:
-      JAVA_OPTS: "-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"
+      JAVA_OPTS: "-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false -Djenkins.CLI.disabled=true"
     ports:
       - "50000:50000"
       - "8080:8080"
@@ -14,6 +14,8 @@ services:
     secrets:
       - jenkins-user
       - jenkins-pass
+      - github-user
+      - github-token
 
 volumes:
   jenkins-data:
@@ -22,4 +24,8 @@ secrets:
   jenkins-user:
     external: true
   jenkins-pass:
+    external: true
+  github-user:
+    external: true
+  github-token:
     external: true
