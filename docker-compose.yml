@@ -1,31 +1,22 @@
 ---
-version: '3.2'
+version: '3.3'
 
 services:
   master:
-    image: hss/jenkins-master:latest
+    image:
+      ${AWS_ACCOUNT}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/hss/jenkins-master:latest
     environment:
-      JAVA_OPTS: "-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false -Djenkins.CLI.disabled=true"
+      JAVA_OPTS:
+        "-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false -Djenkins.CLI.disabled=true"
+      JENKINS_USER: ${JENKINS_USER}
+      JENKINS_PASS: ${JENKINS_PASS}
+      GITHUB_USER: ${GITHUB_USER}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
     ports:
       - "50000:50000"
       - "8080:8080"
     volumes:
-      - jenkins-data:/var/jenkins_home
-    secrets:
-      - jenkins-user
-      - jenkins-pass
-      - github-user
-      - github-token
+      - jenkins_home:/var/jenkins_home
 
 volumes:
-  jenkins-data:
-
-secrets:
-  jenkins-user:
-    external: true
-  jenkins-pass:
-    external: true
-  github-user:
-    external: true
-  github-token:
-    external: true
+  jenkins_home:
