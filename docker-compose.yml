@@ -12,6 +12,7 @@ services:
       JENKINS_PASS: ${JENKINS_PASS}
       GITHUB_USER: ${GITHUB_USER}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_EMAIL: ${GITHUB_EMAIL}
     ports:
       - "50000:50000"
       - "8080:8080"
