@@ -24,9 +24,24 @@ desc.setGlobalConfigEmail(email)
 desc.save()
 
 // https://support.cloudbees.com/hc/en-us/articles/217708168-create-credentials-from-groovy
-String id = java.util.UUID.randomUUID().toString()
-secretText = new StringCredentialsImpl(CredentialsScope.GLOBAL,id, "github jenkins token", Secret.fromString(token))
+String secret_id = java.util.UUID.randomUUID().toString()
+secretText = new StringCredentialsImpl(
+  CredentialsScope.GLOBAL,
+  secret_id,
+  "hss-github-token",
+  Secret.fromString(token)
+)
 SystemCredentialsProvider.getInstance().getStore().addCredentials(Domain.global(), secretText)
+
+String userpass_id = java.util.UUID.randomUUID().toString()
+Credentials userpass = new UsernamePasswordCredentialsImpl(
+  CredentialsScope.GLOBAL,
+  userpass_id,
+  "hss-github-token",
+  user,
+  token
+)
+SystemCredentialsProvider.getInstance().getStore().addCredentials(Domain.global(), userpass)
 
 String githubWebUri = 'https://github.com'
 String githubApiUri = 'https://api.github.com'
