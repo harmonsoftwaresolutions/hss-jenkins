@@ -1,0 +1,324 @@
+---
+AWSTemplateFormatVersion: !!str 2010-09-09
+Description: ECS Jenkins topped with EFS sprinkles
+Parameters:
+  PKeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 Key Pair
+  PVpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC
+  PSubnets:
+    Type: CommaDelimitedList
+    Description: Comma separated subnet ids
+  PAlbPort:
+    Default: 443
+    Description: ALB port
+    Type: Number
+    MinValue: 80
+    MaxValue: 65535
+  PHostPort:
+    Default: 8000
+    Description: Host Port
+    Type: Number
+    MinValue: 80
+    MaxValue: 65535
+  PContainerPort:
+    Default: 8080
+    Description: Container Port
+    Type: Number
+    MinValue: 80
+    MaxValue: 65535
+  PInstanceType:
+    Type: String
+    Description: EC2 Instance Type
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+  PDockerImage:
+    Type: String
+    Description: Docker Image
+  PEFSFileSysId:
+    Type: String
+    Description: EFS File System Id
+  PEFSMountPath:
+    Type: String
+    Description: EFS file mount path
+  PALBSecurityGroup:
+    Type: String
+    Description: ALB Security Group
+  PEFSSecurityGroup:
+    Type: String
+    Description: EFS Security Group
+Mappings:
+  ECSAmiMapping:
+    us-east-1:
+      AMI: ami-aff65ad2
+Resources:
+  ServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: !!str 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: hss-ecs-jenkins
+          PolicyDocument:
+            Version: !!str 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+                  - elasticloadbalancing:DeregisterTargets
+                  - elasticloadbalancing:Describe*
+                  - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+                  - elasticloadbalancing:RegisterTargets
+                  - ec2:Describe*
+                  - ec2:AuthorizeSecurityGroupIngress
+                Resource: '*'
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: !!str 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: hss-ec2-jenkins
+          PolicyDocument:
+            Version: !!str 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:*
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:GetRepositoryPolicy
+                  - ecr:DescribeRepositories
+                  - ecr:ListImages
+                  - ecr:DescribeImages
+                  - ecr:BatchGetImage
+                  - elasticloadbalancing:Describe
+                  - elasticfilesystem:DescribeMountTargets
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2Role
+  JenkinsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: Jenkins-ecs-efs
+      GroupDescription: Jenkins
+      VpcId: !Ref PVpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 65.204.38.226/32
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 65.204.38.226/32
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Jenkins-ecs-efs
+  ALBIngressJenkins:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress from ALB
+      IpProtocol: tcp
+      FromPort: !Ref PAlbPort
+      ToPort: !Ref PAlbPort
+      GroupId: !GetAtt JenkinsSecurityGroup.GroupId
+      SourceSecurityGroupId: !Ref PALBSecurityGroup
+  ALBEgressJenkins:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Egress to ALB
+      IpProtocol: tcp
+      FromPort: !Ref PAlbPort
+      ToPort: !Ref PAlbPort
+      GroupId: !GetAtt JenkinsSecurityGroup.GroupId
+      DestinationSecurityGroupId: !Ref PALBSecurityGroup
+  EFSIngressJenkins:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress from EFS
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      GroupId: !GetAtt JenkinsSecurityGroup.GroupId
+      SourceSecurityGroupId: !Ref PEFSSecurityGroup
+  EFSEgressJenkins:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Egress to EFS
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      GroupId: !GetAtt JenkinsSecurityGroup.GroupId
+      DestinationSecurityGroupId: !Ref PEFSSecurityGroup
+  JenkinsIngressEFS:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress from Jenkins
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      GroupId: !Ref PEFSSecurityGroup
+      SourceSecurityGroupId: !GetAtt JenkinsSecurityGroup.GroupId
+  JenkinsEgressEFS:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Egress to Jenkins
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      GroupId: !Ref PEFSSecurityGroup
+      DestinationSecurityGroupId: !GetAtt JenkinsSecurityGroup.GroupId
+  # JenkinsTargetGroup:
+    # Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    # Properties:
+      # HealthCheckIntervalSeconds: 10
+      # HealthCheckPath: /
+      # HealthCheckProtocol: HTTP
+      # HealthCheckTimeoutSeconds: 5
+      # HealthyThresholdCount: 2
+      # Name: JenkinsTG
+      # Port: !Ref PHostPort
+      # Protocol: HTTP
+      # UnhealthyThresholdCount: 2
+      # VpcId: !Ref PVpcId
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: hss-jenkins
+  # MasterTaskDefinition:
+    # Type: AWS::ECS::TaskDefinition
+    # Properties:
+      # Family: jenkins
+      # NetworkMode: bridge
+      # ContainerDefinition:
+        # - Name: jenkins
+          # Image: !Ref PDockerImage
+          # MountPoints:
+            # - SourceVolume: jenkins-home
+              # ContainerPath: /var/jenkins_home
+          # Essential: true
+          # Cpu: 1024
+          # MemoryReservation: 768
+          # PortMappings:
+            # - HostPort: !Ref PHostPort
+              # ContainerPort: !Ref PContainerPort
+              # Protocol: tcp
+      # Volumes:
+        # - Name: jenkins-home
+          # Host:
+            # SourcePath: /ecs/jenkins_home
+  # ECSService:
+    # Type: AWS::ECS::Service
+    # Properties:
+      # Cluster: !Ref ECSCluster
+      # DesiredCount: 1
+      # ServiceName: jenkins-dev
+      # TaskDefinition: !Ref MasterTaskDefinition
+  ECSAutoScaling:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Ref PSubnets
+      DesiredCapacity: 1
+      LaunchConfigurationName: !Ref ECSLaunchConfiguration
+      MinSize: 1
+      MaxSize: 2
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 400
+      Tags:
+        - Key: Name
+          Value: hss-jenkins-dev
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT10M
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: 'true'
+  ECSLaunchConfiguration:
+    DependsOn:
+      - ECSCluster
+      - JenkinsEgressEFS
+      - JenkinsIngressEFS
+      - EFSIngressJenkins
+      - EFSEgressJenkins
+      - ALBIngressJenkins
+      - ALBEgressJenkins
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvdcz
+          Ebs:
+            VolumeSize: 24
+            DeleteOnTermination: true
+      ImageId: !FindInMap [ECSAmiMapping, !Ref "AWS::Region", AMI]
+      IamInstanceProfile: !Ref InstanceProfile
+      InstanceType: !Ref PInstanceType
+      KeyName: !Ref PKeyName
+      SecurityGroups:
+        - !Ref JenkinsSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          echo "ECS_CLUSTER=${ECSCluster}" >> /etc/ecs/ecs.config
+          yum install -y nfs-utils aws-cli jq aws-cfn-bootstrap
+          ## UNCOMMENT AFTER TESTING SUCCESS
+          mkdir -p ${PEFSMountPath}
+
+          EFS_MOUNT_IP=$(${PEFSFileSysId}.${AWS::Region}.amazonaws.com)
+          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 "$EFS_MOUNT_IP":/ ${PEFSMountPath}
+
+          chown 1000 ${PEFSMountPath}
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ECSAutoScaling --region ${AWS::Region}
+Outputs:
+  Cluster:
+    Value: !Ref ECSCluster
+  # Service:
+    # Value: !Ref ECSService
+  # TaskDef:
+    # Value: !Ref MasterTaskDefinition

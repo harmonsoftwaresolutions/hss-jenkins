@@ -6,7 +6,7 @@ Docker Jenkins is doing rounds
 * jq
 * aws cli installed and configured
 
-## SETUP
+## LOCAL SETUP
 ### Export necessary env variables for your shell, replace with your own info
 ```
 export JENKINS_USER='myuser'
@@ -18,7 +18,7 @@ export AWS_PROFILE='myprofile'
 export AWS_DEFAULT_REGION='myregion'
 export AWS_ACCOUNT='12345566'
 ```
-## USE
+## DOCKER
 ### Build Image
 `docker build -t "${AWS_ACCOUNT}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/hss/jenkins-master" -f ./Dockerfile .`
 
@@ -37,4 +37,26 @@ export AWS_ACCOUNT='12345566'
 ```
 ./docker-login.sh
 docker push ${AWS_ACCOUNT}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/hss/jenkins-master:latest
+```
+
+## AWS
+### Stack Requirements
+This cloudformation template assumes the following resources exist:
+* Application Load Balancer with security group
+* EFS with security group
+* S3 bucket for cloudformation template storage
+* custom VPC created with multiple public subnets
+* EC2 key pair
+* ECR repository for jenkins image
+
+### Stand Up Stack
+### Run Cloudformation Template
+```aws s3 cp hss-ecs-jenkins-efs.yml \
+  s3://hss-dev-cf-templates/hss-ecs-jenkins-efs.yml
+```
+
+```
+aws cloudformation create-stack \
+  --cli-input-json file://params-hss-ecs-jenkins-efs.json \
+  --capabilities CAPABILITY_NAMED_IAM
 ```

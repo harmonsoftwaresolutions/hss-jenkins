@@ -1,0 +1,54 @@
+{
+  "StackName": "hss-ecs-jenkins-efs",
+  "TemplateURL": "https://s3.amazonaws.com/hss-dev-cf-templates/hss-ecs-jenkins-efs.yml",
+  "Parameters": [
+  {
+    "ParameterKey": "PKeyName",
+    "ParameterValue": "deployer-03-19-2018"
+  },
+  {
+    "ParameterKey": "PVpcId",
+    "ParameterValue": "vpc-8db6acf5"
+  },
+  {
+    "ParameterKey": "PSubnets",
+    "ParameterValue": "subnet-ad077482, subnet-f7b49993"
+  },
+  {
+    "ParameterKey": "PAlbPort",
+    "ParameterValue": "443"
+  },
+  {
+    "ParameterKey": "PHostPort",
+    "ParameterValue": "8000"
+  },
+  {
+    "ParameterKey": "PContainerPort",
+    "ParameterValue": "8080"
+  },
+  {
+    "ParameterKey": "PInstanceType",
+    "ParameterValue": "t2.micro"
+  },
+  {
+    "ParameterKey": "PDockerImage",
+    "ParameterValue": "290308544768.dkr.ecr.us-east-1.amazonaws.com/hss/jenkins-master"
+  },
+  {
+    "ParameterKey": "PEFSFileSysId",
+    "ParameterValue": "fs-2030fd68"
+  },
+  {
+    "ParameterKey": "PEFSMountPath",
+    "ParameterValue": "/ecs/jenkins_home"
+  },
+  {
+    "ParameterKey": "PALBSecurityGroup",
+    "ParameterValue": "sg-95fd82e3"
+  },
+  {
+    "ParameterKey": "PEFSSecurityGroup",
+    "ParameterValue": "sg-ecc8b79a"
+  }
+  ]
+}
