@@ -42,9 +42,12 @@ Parameters:
   PEFSFileSysId:
     Type: String
     Description: EFS File System Id
-  PEFSMountPath:
+  PECSMountPath:
     Type: String
-    Description: EFS file mount path
+    Description: ECS folder mount path
+  PEFSMountPrefix:
+    Type: String
+    Description: EFS folder mount prefix
   PALBSecurityGroup:
     Type: String
     Description: ALB Security Group
@@ -213,52 +216,52 @@ Resources:
       ToPort: 2049
       GroupId: !Ref PEFSSecurityGroup
       DestinationSecurityGroupId: !GetAtt JenkinsSecurityGroup.GroupId
-  # JenkinsTargetGroup:
-    # Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    # Properties:
-      # HealthCheckIntervalSeconds: 10
-      # HealthCheckPath: /
-      # HealthCheckProtocol: HTTP
-      # HealthCheckTimeoutSeconds: 5
-      # HealthyThresholdCount: 2
-      # Name: JenkinsTG
-      # Port: !Ref PHostPort
-      # Protocol: HTTP
-      # UnhealthyThresholdCount: 2
-      # VpcId: !Ref PVpcId
+  JenkinsTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Name: JenkinsTG
+      Port: !Ref PHostPort
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref PVpcId
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: hss-jenkins
-  # MasterTaskDefinition:
-    # Type: AWS::ECS::TaskDefinition
-    # Properties:
-      # Family: jenkins
-      # NetworkMode: bridge
-      # ContainerDefinition:
-        # - Name: jenkins
-          # Image: !Ref PDockerImage
-          # MountPoints:
-            # - SourceVolume: jenkins-home
-              # ContainerPath: /var/jenkins_home
-          # Essential: true
-          # Cpu: 1024
-          # MemoryReservation: 768
-          # PortMappings:
-            # - HostPort: !Ref PHostPort
-              # ContainerPort: !Ref PContainerPort
-              # Protocol: tcp
-      # Volumes:
-        # - Name: jenkins-home
-          # Host:
-            # SourcePath: /ecs/jenkins_home
-  # ECSService:
-    # Type: AWS::ECS::Service
-    # Properties:
-      # Cluster: !Ref ECSCluster
-      # DesiredCount: 1
-      # ServiceName: jenkins-dev
-      # TaskDefinition: !Ref MasterTaskDefinition
+  MasterTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: jenkins
+      NetworkMode: bridge
+      ContainerDefinition:
+        - Name: jenkins
+          Image: !Ref PDockerImage
+          MountPoints:
+            - SourceVolume: jenkins-home
+              ContainerPath: /var/jenkins_home
+          Essential: true
+          Cpu: 1024
+          MemoryReservation: 768
+          PortMappings:
+            - HostPort: !Ref PHostPort
+              ContainerPort: !Ref PContainerPort
+              Protocol: tcp
+      Volumes:
+        - Name: jenkins-home
+          Host:
+            SourcePath: /ecs/jenkins_home
+  ECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ECSCluster
+      DesiredCount: 1
+      ServiceName: jenkins-dev
+      TaskDefinition: !Ref MasterTaskDefinition
   ECSAutoScaling:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
@@ -307,18 +310,18 @@ Resources:
           #!/bin/bash
           echo "ECS_CLUSTER=${ECSCluster}" >> /etc/ecs/ecs.config
           yum install -y nfs-utils aws-cli jq aws-cfn-bootstrap
-          ## UNCOMMENT AFTER TESTING SUCCESS
-          mkdir -p ${PEFSMountPath}
 
-          EFS_MOUNT_IP=$(${PEFSFileSysId}.${AWS::Region}.amazonaws.com)
-          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 "$EFS_MOUNT_IP":/ ${PEFSMountPath}
+          mkdir -p ${PECSMountPath}
+          EFS_MOUNT_DNS='${PEFSFileSysId}.efs.${AWS::Region}.amazonaws.com'
+          echo $EFS_MOUNT_DNS
+          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 $EFS_MOUNT_DNS:/${PEFSMountPrefix} ${PECSMountPath}
 
-          chown 1000 ${PEFSMountPath}
+          chown 1000 ${PECSMountPath}
           /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ECSAutoScaling --region ${AWS::Region}
 Outputs:
   Cluster:
     Value: !Ref ECSCluster
-  # Service:
-    # Value: !Ref ECSService
-  # TaskDef:
-    # Value: !Ref MasterTaskDefinition
+  Service:
+    Value: !Ref ECSService
+  TaskDef:
+    Value: !Ref MasterTaskDefinition
